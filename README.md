@@ -1,6 +1,6 @@
-<center><img src="img/logo.png" alt="Logo" style="width: 80px; vertical-align: middle;"></center>
 
-## FLUX-CustomID: Realistically Customize Your Personal ID to Perfection
+
+## <img src="img/logo.png" alt="Logo" style="width: 80px; vertical-align: middle;">FLUX-CustomID: Realistically Customize Your Personal ID to Perfection
 
 This repository is the official implementation of FLUX-CustomID. It is capable of generating images based on your face image at a level equivalent to real photographic quality. Our base model is FLUX.dev, which ensures the generation of high-quality images.
 
@@ -26,8 +26,8 @@ pip install -i https://mirrors.cloud.tencent.com/pypi/simple  diffusers==0.31.0 
 ### 2. Prepare Pretrained Checkpoints
 
 ```
-git clone https://github.com/damo-cv/CustomID.git
-cd CustomID
+git clone https://github.com/damo-cv/FLUX-customID.git
+cd FLUX-customID
 
 mkdir pretrained_ckpt
 cd pretrained_ckpt
