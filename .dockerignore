@@ -1,0 +1,44 @@
+# Version control
+.git
+.gitignore
+.gitattributes
+
+# Development
+*.ipynb
+*.ipynb_checkpoints
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.py[cod]
+*$py.class
+
+# Environment
+.env
+.venv
+env/
+venv/
+ENV/
+
+# Documentation
+*.md
+!README.md
+!RUNPOD_DEPLOYMENT.md
+LICENSE
+img/
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# Temporary files
+*.log
+*.tmp
+.DS_Store
+
+# Test files
+test/
+tests/

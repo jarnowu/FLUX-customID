@@ -1,0 +1,17 @@
+torch==2.4.0
+torchvision==0.19.0
+diffusers==0.31.0
+transformers
+onnxruntime-gpu
+insightface
+sentencepiece
+matplotlib
+imageio
+tqdm
+numpy
+einops
+accelerate
+peft
+Pillow
+runpod
+opencv-python
