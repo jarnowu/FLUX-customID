@@ -27,7 +27,7 @@ This guide focuses on deploying via RunPod's GitHub integration, which is the re
 
 ### 2. Configure Deployment
 - **Branch**: Select your deployment branch (e.g., main)
-- **Dockerfile Path**: `/Dockerfile` (root directory)
+- **Dockerfile Path**: `Dockerfile` (root directory)
 - **Environment Variables**: None required
 
 Note: Your first build will take some time, but subsequent builds will be faster due to RunPod's intelligent layer caching.
