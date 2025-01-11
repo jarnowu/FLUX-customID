@@ -42,7 +42,12 @@ Before deploying the endpoint, you need to set up persistent storage for the mod
      - CLIP model: ~15GB
      - FLUX.1-dev: ~54GB
      - FLUX-customID: ~3.4GB
-   - Container Path: /workspace
+   - Container Path: /workspace (IMPORTANT: This exact path is required)
+
+Note: The /workspace path is critical as the handler expects models in specific locations:
+- /workspace/pretrained_ckpt/flux.1-dev/
+- /workspace/pretrained_ckpt/openclip-vit-h-14/
+- /workspace/pretrained_ckpt/FLUX-customID.pt
 
 2. Create a One-Time Pod:
    - Select any GPU (e.g., NVIDIA A5000)
@@ -180,7 +185,9 @@ Note: Ensure the volume containing the models is attached to enable the endpoint
 }
 ```
 
-## Testing
+## Testing and Troubleshooting
+
+### Testing the Endpoint
 1. Once deployed, get your endpoint URL from RunPod dashboard
 2. Test using the following curl command (replace with your endpoint URL):
 ```bash
@@ -194,8 +201,36 @@ curl -X POST "https://your-endpoint.runpod.net" \
      }'
 ```
 
+### Common Issues and Solutions
+
+1. Worker Initialization Failures:
+   - Check logs for "Workspace directory not found" - Ensure volume is mounted at /workspace
+   - Check logs for "Required model file/directory not found" - Verify all models are in correct paths
+   - Check CUDA/GPU availability in logs
+   - Verify model file permissions
+
+2. Request Timeouts:
+   - Increase worker timeout settings if needed
+   - Monitor GPU memory usage
+   - Check for model loading delays
+
+3. Image Processing Errors:
+   - Verify input image format (supported: JPEG, JPG, PNG, WEBP)
+   - Check image dimensions (max: 2048x2048)
+   - Monitor temp directory space
+
+### Log Monitoring
+The worker now provides detailed logging at each initialization step:
+- Workspace directory verification
+- Model path validation
+- Transformer loading
+- Pipeline initialization
+- Model initialization
+
+Monitor these logs in the RunPod dashboard for troubleshooting.
+
 ## Monitoring and Build Status
-Monitor your deployment in the RunPod dashboard. Builds can have the following statuses:
+Monitor your deployment in the RunPod dashboard. The worker provides detailed logging for debugging. Builds can have the following statuses:
 - **Building**: Container is currently building
 - **Failed**: Build failed - check logs for details
 - **Pending**: Build is scheduled
@@ -219,3 +254,8 @@ You can maintain separate environments by:
 3. Adjust compute settings based on usage
 4. Use appropriate timeout settings
 5. Monitor costs and adjust scaling accordingly
+6. Regularly check worker logs for issues
+7. Verify model file integrity after volume updates
+8. Monitor GPU memory usage
+9. Keep track of request latencies
+10. Set up alerts for worker failures

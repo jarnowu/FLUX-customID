@@ -1,0 +1,221 @@
+{
+  "name": "FLUX-customID Image Generation",
+  "description": "Generate custom ID photos using FLUX-customID API",
+  "blueprint": {
+    "nodes": [
+      {
+        "id": "webhook",
+        "module": "http:webhook",
+        "metadata": {
+          "name": "Receive Image",
+          "position": {
+            "x": 0,
+            "y": 0
+          }
+        },
+        "settings": {
+          "method": "POST",
+          "responseMode": "IMMEDIATELY",
+          "responseContentType": "application/json"
+        }
+      },
+      {
+        "id": "prepare_image",
+        "module": "tools:converter",
+        "metadata": {
+          "name": "Convert to Base64",
+          "position": {
+            "x": 300,
+            "y": 0
+          }
+        },
+        "settings": {
+          "operation": "toBase64",
+          "source": "{{webhook.data.image}}"
+        }
+      },
+      {
+        "id": "validate_input",
+        "module": "flow:router",
+        "metadata": {
+          "name": "Validate Input",
+          "position": {
+            "x": 600,
+            "y": 0
+          }
+        },
+        "settings": {
+          "rules": [
+            {
+              "condition": "{{prepare_image}} != null && {{webhook.data.prompt}} != ''",
+              "path": "valid"
+            },
+            {
+              "condition": "true",
+              "path": "invalid"
+            }
+          ]
+        }
+      },
+      {
+        "id": "generate_image",
+        "module": "http:request",
+        "metadata": {
+          "name": "Generate ID Photo",
+          "position": {
+            "x": 900,
+            "y": 0
+          }
+        },
+        "settings": {
+          "url": "https://your-runpod-endpoint.runpod.net",
+          "method": "POST",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "input": {
+              "image": "{{prepare_image}}",
+              "prompt": "{{webhook.data.prompt}}",
+              "num_samples": "{{webhook.data.num_samples || 1}}",
+              "height": "{{webhook.data.height || 1024}}",
+              "width": "{{webhook.data.width || 1024}}",
+              "num_inference_steps": "{{webhook.data.num_inference_steps || 28}}",
+              "guidance_scale": "{{webhook.data.guidance_scale || 3.5}}"
+            }
+          },
+          "timeout": 300000
+        }
+      },
+      {
+        "id": "process_response",
+        "module": "flow:router",
+        "metadata": {
+          "name": "Process Response",
+          "position": {
+            "x": 1200,
+            "y": 0
+          }
+        },
+        "settings": {
+          "rules": [
+            {
+              "condition": "{{generate_image.status}} == 'success'",
+              "path": "success"
+            },
+            {
+              "condition": "true",
+              "path": "error"
+            }
+          ]
+        }
+      },
+      {
+        "id": "process_images",
+        "module": "tools:repeater",
+        "metadata": {
+          "name": "Process Images",
+          "position": {
+            "x": 1500,
+            "y": 0
+          }
+        },
+        "settings": {
+          "mode": "foreach",
+          "array": "{{generate_image.output}}"
+        }
+      },
+      {
+        "id": "convert_to_file",
+        "module": "tools:converter",
+        "metadata": {
+          "name": "Convert to File",
+          "position": {
+            "x": 1800,
+            "y": 0
+          }
+        },
+        "settings": {
+          "operation": "fromBase64",
+          "filename": "generated_id_{{timestamp}}.png",
+          "mimeType": "image/png"
+        }
+      },
+      {
+        "id": "store_result",
+        "module": "storage:store",
+        "metadata": {
+          "name": "Store Result",
+          "position": {
+            "x": 2100,
+            "y": 0
+          }
+        },
+        "settings": {
+          "provider": "internal",
+          "folder": "/generated-ids"
+        }
+      },
+      {
+        "id": "error_response",
+        "module": "http:response",
+        "metadata": {
+          "name": "Error Response",
+          "position": {
+            "x": 1200,
+            "y": 300
+          }
+        },
+        "settings": {
+          "status": 400,
+          "body": {
+            "status": "error",
+            "message": "{{if(generate_image.error, generate_image.error, 'Invalid input parameters')}}"
+          }
+        }
+      }
+    ],
+    "connections": [
+      {
+        "from": "webhook",
+        "to": "prepare_image"
+      },
+      {
+        "from": "prepare_image",
+        "to": "validate_input"
+      },
+      {
+        "from": "validate_input",
+        "to": "generate_image",
+        "path": "valid"
+      },
+      {
+        "from": "validate_input",
+        "to": "error_response",
+        "path": "invalid"
+      },
+      {
+        "from": "generate_image",
+        "to": "process_response"
+      },
+      {
+        "from": "process_response",
+        "to": "process_images",
+        "path": "success"
+      },
+      {
+        "from": "process_response",
+        "to": "error_response",
+        "path": "error"
+      },
+      {
+        "from": "process_images",
+        "to": "convert_to_file"
+      },
+      {
+        "from": "convert_to_file",
+        "to": "store_result"
+      }
+    ]
+  }
+}

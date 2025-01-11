@@ -5,55 +5,74 @@ import gc
 import time
 from pathlib import Path
 import runpod
+import logging
 from PIL import Image
 import torch
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Global model variable
+model = None
 from src.customID.pipeline_flux import FluxPipeline
 from src.customID.transformer_flux import FluxTransformer2DModel
 from src.customID.model import CustomIDModel
 
 DEVICE = "cuda"
 DTYPE = torch.float16  # Using float16 for deployment instead of bfloat16
-MODEL_PATH = "pretrained_ckpt/flux.1-dev"
-TRAINED_CKPT = "pretrained_ckpt/FLUX-customID.pt"
+WORKSPACE_DIR = "/workspace"
+MODEL_PATH = os.path.join(WORKSPACE_DIR, "pretrained_ckpt/flux.1-dev")
+TRAINED_CKPT = os.path.join(WORKSPACE_DIR, "pretrained_ckpt/FLUX-customID.pt")
+CLIP_PATH = os.path.join(WORKSPACE_DIR, "pretrained_ckpt/openclip-vit-h-14")
 NUM_TOKENS = 64
 MAX_IMAGE_SIZE = (2048, 2048)  # Maximum input image dimensions
 SUPPORTED_FORMATS = {'JPEG', 'JPG', 'PNG', 'WEBP'}
+
+# Ensure workspace directory exists
+if not os.path.exists(WORKSPACE_DIR):
+    raise RuntimeError(f"Workspace directory not found: {WORKSPACE_DIR}")
 
 def verify_models():
     """Verify all required model files exist"""
     required_files = [
         Path(MODEL_PATH),
         Path(TRAINED_CKPT),
-        Path("pretrained_ckpt/openclip-vit-h-14")
+        Path(CLIP_PATH)
     ]
     
     for file_path in required_files:
         if not file_path.exists():
             raise RuntimeError(f"Required model file/directory not found: {file_path}")
 
-def init():
+def init_model():
+    """Initialize the model during cold start"""
+    logger.info(f"Workspace directory: {WORKSPACE_DIR}")
+    logger.info(f"Model path: {MODEL_PATH}")
+    logger.info(f"Trained checkpoint: {TRAINED_CKPT}")
+    logger.info(f"CLIP path: {CLIP_PATH}")
     """Initialize the model during cold start"""
     global model
     
     try:
-        print("Verifying model files...")
+        logger.info("Verifying model files...")
         verify_models()
         
-        print("Loading FLUX transformer...")
+        logger.info("Loading FLUX transformer...")
         transformer = FluxTransformer2DModel.from_pretrained(
             MODEL_PATH, 
             subfolder="transformer", 
             torch_dtype=DTYPE
         ).to(DEVICE)
         
-        print("Loading FLUX pipeline...")
+        logger.info("Loading FLUX pipeline...")
         pipe = FluxPipeline.from_pretrained(
             MODEL_PATH,
             transformer=transformer,
             torch_dtype=DTYPE
         ).to(DEVICE)
         
-        print("Initializing CustomID model...")
+        logger.info("Initializing CustomID model...")
         model = CustomIDModel(
             pipe,
             TRAINED_CKPT,
@@ -61,10 +80,11 @@ def init():
             DTYPE,
             NUM_TOKENS
         )
-        print("Model loaded successfully")
+        logger.info("Model loaded successfully")
+        return True
         
     except Exception as e:
-        print(f"Error during initialization: {str(e)}")
+        logger.error(f"Error during initialization: {str(e)}")
         raise RuntimeError(f"Failed to initialize model: {str(e)}")
 
 def validate_image(image):
@@ -178,8 +198,23 @@ def handler(event):
         
         cleanup()  # Clear CUDA cache
 
-# Initialize the model
-init()
+def init():
+    """RunPod initialization function"""
+    try:
+        logger.info("Starting model initialization...")
+        success = init_model()
+        if success:
+            logger.info("Model initialization completed successfully")
+            return True
+        return False
+    except Exception as e:
+        logger.error(f"Failed to initialize: {str(e)}")
+        return False
 
-# Start the runpod handler
-runpod.serverless.start({"handler": handler})
+if __name__ == "__main__":
+    logger.info("Starting RunPod worker...")
+    runpod.serverless.start({
+        "handler": handler,
+        "init": init,
+        "return_aggregate_errors": True
+    })
