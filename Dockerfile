@@ -12,13 +12,6 @@ RUN pip3 install --no-cache-dir torch==2.4.0 torchvision==0.19.0 --extra-index-u
 COPY requirements.txt .
 RUN pip3 install --no-cache-dir -r requirements.txt huggingface-hub runpod
 
-# Download model checkpoints
-RUN mkdir -p pretrained_ckpt && \
-    cd pretrained_ckpt && \
-    huggingface-cli download --resume-download "laion/CLIP-ViT-H-14-laion2B-s32B-b79K" --local-dir openclip-vit-h-14 && \
-    huggingface-cli download --resume-download "black-forest-labs/FLUX.1-dev" --local-dir flux.1-dev && \
-    huggingface-cli download --resume-download "Damo-vision/FLUX-customID" --local-dir . --include="*.pt"
-
 # Copy project files
 COPY . .
 

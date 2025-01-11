@@ -1,9 +1,9 @@
-# FLUX-CustomID RunPod Serverless Deployment Guide
+# FLUX-customID RunPod Serverless Deployment Guide
 
 ## Prerequisites
 - RunPod account
 - GitHub account
-- Repository access to FLUX-CustomID
+- Repository access to https://github.com/jarnowu/FLUX-customID.git
 - NVIDIA GPU (16GB+ VRAM recommended)
 
 ## Important Note
@@ -23,7 +23,7 @@ This guide focuses on deploying via RunPod's GitHub integration, which is the re
    - You can authorize through settings page or during first deployment
    - Choose between "All repositories" or "Only select repositories"
    - Only one GitHub account can be connected per RunPod account
-5. Select the FLUX-CustomID repository
+5. Select the FLUX-customID repository (https://github.com/jarnowu/FLUX-customID.git)
 
 ### 2. Configure Deployment
 - **Branch**: Select your deployment branch (e.g., main)
@@ -31,6 +31,67 @@ This guide focuses on deploying via RunPod's GitHub integration, which is the re
 - **Environment Variables**: None required
 
 Note: Your first build will take some time, but subsequent builds will be faster due to RunPod's intelligent layer caching.
+
+### Model Storage Setup
+Before deploying the endpoint, you need to set up persistent storage for the models:
+
+1. Create a RunPod Storage Volume:
+   - Go to Storage > New Volume
+   - Name: flux-models
+   - Size: 80GB minimum (required for all models):
+     - CLIP model: ~15GB
+     - FLUX.1-dev: ~54GB
+     - FLUX-customID: ~3.4GB
+   - Container Path: /workspace
+
+2. Create a One-Time Pod:
+   - Select any GPU (e.g., NVIDIA A5000)
+   - Attach the created volume to /workspace
+   - Start the pod and open the terminal
+
+3. Install and Configure Hugging Face CLI:
+   ```bash
+   # Install huggingface-hub
+   pip install --user huggingface-hub
+
+   # Add to PATH
+   export PATH="/root/.local/bin:$PATH"
+
+   # Login to Hugging Face (replace with your token)
+   huggingface-cli login --token hf_xxxxxxxxxxxxxxxxxxxx
+   ```
+
+4. Download Models to Volume:
+   ```bash
+   # Create directory for models
+   cd /workspace
+   mkdir -p pretrained_ckpt
+   cd pretrained_ckpt
+
+   # Download CLIP model (~15GB)
+   huggingface-cli download --resume-download "laion/CLIP-ViT-H-14-laion2B-s32B-b79K" --local-dir openclip-vit-h-14
+
+   # Download FLUX.1-dev model (~54GB)
+   huggingface-cli download --resume-download "black-forest-labs/FLUX.1-dev" --local-dir flux.1-dev
+
+   # Download FLUX-customID model (~3.4GB)
+   huggingface-cli download --resume-download "Damo-vision/FLUX-customID" --local-dir . --include="*.pt"
+   ```
+
+   Note: The FLUX.1-dev model requires Hugging Face authentication. You can get your token from https://huggingface.co/settings/tokens
+
+5. Verify Downloads:
+   ```bash
+   # Check space usage
+   df -h
+   du -sh /workspace/pretrained_ckpt/*
+   ```
+
+6. Configure Endpoint:
+   - When creating serverless endpoint, attach the volume
+   - Mount path: /workspace
+   
+Note: RunPod handles all aspects of volume mounting automatically at runtime, including directory creation. No special configuration is needed in the Dockerfile.
 
 The Dockerfile should contain:
 ```dockerfile
@@ -48,13 +109,6 @@ RUN pip3 install --no-cache-dir torch==2.4.0 torchvision==0.19.0 --extra-index-u
 COPY requirements.txt .
 RUN pip3 install --no-cache-dir -r requirements.txt huggingface-hub runpod
 
-# Download model checkpoints
-RUN mkdir -p pretrained_ckpt && \
-    cd pretrained_ckpt && \
-    huggingface-cli download --resume-download "laion/CLIP-ViT-H-14-laion2B-s32B-b79K" --local-dir openclip-vit-h-14 && \
-    huggingface-cli download --resume-download "black-forest-labs/FLUX.1-dev" --local-dir flux.1-dev && \
-    huggingface-cli download --resume-download "Damo-vision/FLUX-customID" --local-dir . --include="*.pt"
-
 # Copy project files
 COPY . .
 
@@ -67,10 +121,15 @@ This Dockerfile:
 - Installs Python 3.10 and pip
 - Sets up PyTorch with CUDA support
 - Installs project requirements including runpod
-- Downloads required model checkpoints
 - Sets up the RunPod serverless worker
 
-### 3. Configure Compute
+Note: Models are not downloaded during container build but are accessed from the mounted volume, which:
+- Speeds up deployments significantly
+- Makes builds more reliable
+- Reduces bandwidth usage
+- Improves cold start times
+
+### 7. Configure Compute
 Recommended settings:
 - **GPU**: NVIDIA A5000 or better
 - **Container Disk**: 20GB
@@ -78,6 +137,9 @@ Recommended settings:
 - **Idle timeout**: 5 minutes
 - **Min Instances**: 0
 - **Max Instances**: Based on your needs
+- **Volume**: Attach flux-models volume at /workspace
+
+Note: Ensure the volume containing the models is attached to enable the endpoint to access the required model files.
 
 ## API Schema
 
