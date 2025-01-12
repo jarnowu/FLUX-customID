@@ -22,7 +22,7 @@ FROM nvidia/cuda:11.8.0-cudnn8-runtime-ubuntu22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
-WORKDIR /app
+WORKDIR /workspace
 
 # Install Python and runtime dependencies
 RUN apt-get update && apt-get install -y \
@@ -36,13 +36,17 @@ RUN apt-get update && apt-get install -y \
 COPY --from=builder /usr/local/lib/python3.10/dist-packages /usr/local/lib/python3.10/dist-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 
-# Copy only necessary project files
+# Copy project files
 COPY handler.py .
 COPY src ./src
+COPY pretrained_ckpt ./pretrained_ckpt
+
+# Create required directories
+RUN mkdir -p /tmp
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
     CMD python3 -c "import requests; requests.get('http://localhost:8000/health')"
 
 # RunPod entry point
-CMD [ "python3", "-m", "runpod.serverless.worker", "--handler-path", "/app/handler.py", "--log-level", "debug" ]
+CMD [ "python3", "-m", "runpod.serverless.worker", "--handler-path", "/workspace/handler.py", "--log-level", "debug" ]
